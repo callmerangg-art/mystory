@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đọc Truyện Cuộn Dọc</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; background: #f4f4f9; font-family: sans-serif; }
+    #viewer { max-width: 800px; margin: 0 auto; padding: 20px; background: #fff; min-height: 100vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+  <script>
+    var book = ePub("./COTHE.epub");
+    var rendition = book.renderTo("viewer", {
+      flow: "scrolled-doc",
+      width: "100%"
+    });
+    rendition.display();
+  </script>
+</body>
+</html>
