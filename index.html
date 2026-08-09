@@ -7,19 +7,62 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; background: #f4f4f9; font-family: sans-serif; }
-    #viewer { max-width: 800px; margin: 0 auto; padding: 20px; background: #fff; min-height: 100vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    body, html { margin: 0; padding: 0; background: #f4f4f9; font-family: sans-serif; }
+    
+    /* Thanh điều khiển chọn chương cố định góc trên */
+    #controls {
+      position: fixed; top: 0; left: 0; right: 0; height: 50px;
+      background: #333; color: #fff; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 15px; z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    select { padding: 5px 10px; font-size: 14px; max-width: 60%; border-radius: 4px; }
+    button { padding: 6px 12px; font-size: 14px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; }
+    
+    /* Vùng hiển thị nội dung cuộn dọc */
+    #viewer { max-width: 800px; margin: 60px auto 20px auto; padding: 20px; background: #fff; min-height: 90vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
   </style>
 </head>
 <body>
+
+  <div id="controls">
+    <button id="prev">Chương trước</button>
+    <select id="toc"></select>
+    <button id="next">Chương sau</button>
+  </div>
+
   <div id="viewer"></div>
+
   <script>
     var book = ePub("./COTHE.epub");
     var rendition = book.renderTo("viewer", {
-      flow: "scrolled-doc",
+      flow: "scrolled-doc", // Cuộn dọc mượt mà
       width: "100%"
     });
+
     rendition.display();
+
+    // Load danh sách chương vào Menu Select
+    book.loaded.navigation.then(function(toc){
+      var select = document.getElementById("toc");
+      toc.forEach(function(chapter) {
+        var option = document.createElement("option");
+        option.textContent = chapter.label.trim();
+        option.ref = chapter.href;
+        select.appendChild(option);
+      });
+
+      select.onchange = function(){
+        var index = select.selectedIndex;
+        var url = select.options[index].ref;
+        rendition.display(url);
+      };
+    });
+
+    // Nút chuyển chương nhanh
+    document.getElementById("next").onclick = function() { rendition.next(); };
+    document.getElementById("prev").onclick = function() { rendition.prev(); };
   </script>
+
 </body>
 </html>
