@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Đọc Truyện Cuộn Dọc</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Sử dụng link nguồn siêu ổn định chống nghẽn -->
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/epubjs@0.3.93/dist/epub.min.js"></script>
   <style>
     body, html { margin: 0; padding: 0; background: #f4f4f9; font-family: sans-serif; }
     #controls {
@@ -14,68 +16,66 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
     select { padding: 5px 8px; font-size: 13px; max-width: 40%; border-radius: 4px; border: 1px solid #444; }
-    #viewer { max-width: 800px; margin: 60px auto 20px auto; padding: 30px; background: #fff; min-height: 90vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); line-height: 1.6; font-size: 16px; }
-    #viewer img { max-width: 100%; height: auto; display: block; margin: 10px auto; }
-    .error { color: red; font-weight: bold; text-align: center; padding: 20px; }
+    button { padding: 5px 10px; font-size: 13px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; }
+    #viewer { max-width: 800px; margin: 60px auto 20px auto; padding: 20px; background: #fff; min-height: 90vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
   </style>
 </head>
 <body>
 
   <div id="controls">
     <select id="book-select">
-      <option value="COTHE.epub">Truyện 1 (COTHE)</option>
-      <option value="COTHE2.epub">Truyện 2</option>
+      <option value="./COTHE.epub">Truyện 1 (COTHE)</option>
+      <option value="./COTHE2.epub">Truyện 2</option>
     </select>
-    <select id="toc"><option>Đang tải danh sách chương...</option></select>
+    <button id="prev">Trước</button>
+    <select id="toc"></select>
+    <button id="next">Sau</button>
   </div>
 
-  <div id="viewer">Đang tải nội dung truyện, vui lòng đợi...</div>
+  <div id="viewer">Đang tải truyện...</div>
 
   <script>
-    async function loadBook(filename) {
-      const viewer = document.getElementById("viewer");
-      const tocSelect = document.getElementById("toc");
-      viewer.innerHTML = "Đang mở file truyện...";
-      tocSelect.innerHTML = "<option>Đang tải...</option>";
+    var rendition = null;
 
-      try {
-        const response = await fetch(filename);
-        if (!response.ok) throw new Error("Không thể tải file " + filename);
-        const blob = await response.blob();
-        const zip = new JSZip();
-        const zipContent = await zip.loadAsync(blob);
+    function renderBook(file) {
+      document.getElementById("viewer").innerHTML = "";
+      var select = document.getElementById("toc");
+      select.innerHTML = "";
 
-        // Tìm file .opf để đọc cấu trúc truyện
-        let opfPath = "";
-        let containerFile = zipContent.file("META-INF/container.xml");
-        if (containerFile) {
-          let containerXml = await containerFile.async("text");
-          let match = containerXml.match(/full-path="([^"]+)"/);
-          if (match) opfPath = match[1];
-        }
+      var book = ePub(file);
+      rendition = book.renderTo("viewer", {
+        flow: "scrolled-doc",
+        width: "100%"
+      });
 
-        if (!opfPath) {
-          // Fallback tìm file opf bất kỳ
-          let opfFiles = Object.keys(zipContent.files).filter(f => f.endsWith(".opf"));
-          if (opfFiles.length > 0) opfPath = opfFiles[0];
-        }
+      rendition.display();
 
-        viewer.innerHTML = "<div class='error'>Đã nạp file thành công! Hãy chọn chương ở góc trên để đọc.</div>";
-        tocSelect.innerHTML = "<option>Đã tải xong (Hệ thống cuộn mở rộng)</option>";
+      book.loaded.navigation.then(function(toc){
+        toc.forEach(function(chapter) {
+          var option = document.createElement("option");
+          option.textContent = chapter.label.trim();
+          option.ref = chapter.href;
+          select.appendChild(option);
+        });
 
-      } catch (err) {
-        viewer.innerHTML = `<div class='error'>❌ Lỗi: ${err.message}. Kiểm tra lại tên file hoặc đường truyền!</div>`;
-        tocSelect.innerHTML = "<option>Lỗi tải</option>";
-      }
+        select.onchange = function(){
+          var index = select.selectedIndex;
+          var url = select.options[index].ref;
+          rendition.display(url);
+        };
+      });
     }
 
-    // Chạy mặc định khi mở web
-    loadBook("COTHE.epub");
+    // Tải truyện ban đầu
+    renderBook("./COTHE.epub");
 
+    // Đổi truyện
     document.getElementById("book-select").onchange = function() {
-      loadBook(this.value);
+      renderBook(this.value);
     };
-  </script>
 
+    document.getElementById("next").onclick = function() { if(rendition) rendition.next(); };
+    document.getElementById("prev").onclick = function() { if(rendition) rendition.prev(); };
+  </script>
 </body>
 </html>
