@@ -2,104 +2,80 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Đọc Truyện Cuộn Dọc</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.88/dist/epub.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
     body, html { margin: 0; padding: 0; background: #f4f4f9; font-family: sans-serif; }
     #controls {
       position: fixed; top: 0; left: 0; right: 0; height: 50px;
       background: #1e1e2f; color: #fff; display: flex; align-items: center;
-      justify-content: space-around; padding: 0 5px; z-index: 10000;
+      justify-content: space-around; padding: 0 10px; z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    select { padding: 5px; font-size: 12px; max-width: 42%; border-radius: 4px; background: #fff; color: #000; }
-    button { padding: 6px 10px; font-size: 12px; border: none; background: #007bff; color: white; border-radius: 4px; }
-    #viewer { 
-      width: 100%; max-width: 800px; margin: 55px auto 10px auto; 
-      padding: 15px; background: #fff; min-height: 80vh; overflow-x: hidden;
-    }
-    .error-msg { color: red; font-weight: bold; text-align: center; padding: 20px; }
+    select { padding: 5px 8px; font-size: 13px; max-width: 40%; border-radius: 4px; border: 1px solid #444; }
+    button { padding: 5px 10px; font-size: 13px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; }
+    #viewer { max-width: 800px; margin: 60px auto 20px auto; padding: 20px; background: #fff; min-height: 90vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
   </style>
 </head>
 <body>
 
-  <div id="controls" class="notranslate">
+  <div id="controls">
     <select id="book-select">
       <option value="COTHE.epub">Truyện 1 (COTHE)</option>
       <option value="COTHE2.epub">Truyện 2</option>
     </select>
     <button id="prev">Trước</button>
-    <select id="toc"><option>Chọn chương...</option></select>
+    <select id="toc"></select>
     <button id="next">Sau</button>
   </div>
 
-  <div id="viewer">Đang khởi tạo bộ đọc...</div>
+  <div id="viewer"></div>
 
   <script>
-    var rendition = null;
     var currentBook = null;
+    var rendition = null;
 
-    async function renderBook(fileName) {
-      var viewer = document.getElementById("viewer");
+    function loadEpub(bookPath) {
+      document.getElementById("viewer").innerHTML = "";
       var select = document.getElementById("toc");
-      viewer.innerHTML = "⏳ Đang tải file truyện (" + fileName + ")...";
-      select.innerHTML = "<option>Đang tải chương...</option>";
+      select.innerHTML = "";
 
-      try {
-        // Tải file dưới dạng ArrayBuffer để tránh xung đột CORS/MIME
-        var response = await fetch(fileName);
-        if (!response.ok) throw new Error("Không tìm thấy file " + fileName);
-        var buffer = await response.arrayBuffer();
+      currentBook = ePub(bookPath);
+      rendition = currentBook.renderTo("viewer", {
+        flow: "scrolled-doc",
+        width: "100%"
+      });
 
-        if (rendition) rendition.destroy();
+      rendition.display();
 
-        currentBook = ePub(buffer);
-        rendition = currentBook.renderTo("viewer", {
-          flow: "scrolled-doc",
-          width: "100%",
-          height: "100%"
+      currentBook.loaded.navigation.then(function(toc){
+        select.innerHTML = "";
+        toc.forEach(function(chapter) {
+          var option = document.createElement("option");
+          option.textContent = chapter.label.trim();
+          option.ref = chapter.href;
+          select.appendChild(option);
         });
 
-        await rendition.display();
-
-        currentBook.loaded.navigation.then(function(toc){
-          select.innerHTML = "";
-          if(!toc || toc.length === 0) {
-            select.innerHTML = "<option>Không có danh sách chương</option>";
-            return;
-          }
-          toc.forEach(function(chapter) {
-            var option = document.createElement("option");
-            option.textContent = chapter.label.trim();
-            option.ref = chapter.href;
-            select.appendChild(option);
-          });
-
-          select.onchange = function(){
-            var index = select.selectedIndex;
-            var url = select.options[index].ref;
-            rendition.display(url);
-          };
-        });
-
-      } catch (err) {
-        viewer.innerHTML = "<div class='error-msg'>❌ Lỗi: " + err.message + "<br>Hãy kiểm tra lại tên file trên GitHub!</div>";
-      }
+        select.onchange = function(){
+          var index = select.selectedIndex;
+          var url = select.options[index].ref;
+          rendition.display(url);
+        };
+      });
     }
 
-    // Tự động chạy khi load xong
-    window.addEventListener("load", function() {
-      renderBook("COTHE.epub");
-    });
+    loadEpub("COTHE.epub");
 
     document.getElementById("book-select").onchange = function() {
-      renderBook(this.value);
+      loadEpub(this.value);
     };
 
     document.getElementById("next").onclick = function() { if(rendition) rendition.next(); };
     document.getElementById("prev").onclick = function() { if(rendition) rendition.prev(); };
   </script>
+
 </body>
 </html>
