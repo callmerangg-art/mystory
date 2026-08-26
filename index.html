@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Đọc Truyện Cuộn Dọc</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/epubjs@0.3.93/dist/epub.min.js"></script>
   <style>
     body, html { margin: 0; padding: 0; background: #f4f4f9; font-family: sans-serif; }
     #controls {
@@ -17,6 +17,7 @@
     select { padding: 5px 8px; font-size: 13px; max-width: 40%; border-radius: 4px; border: 1px solid #444; }
     button { padding: 5px 10px; font-size: 13px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; }
     #viewer { max-width: 800px; margin: 60px auto 20px auto; padding: 20px; background: #fff; min-height: 90vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    .error-msg { color: red; font-weight: bold; padding: 20px; text-align: center; }
   </style>
 </head>
 <body>
@@ -31,46 +32,62 @@
     <button id="next">Sau</button>
   </div>
 
-  <div id="viewer">Đang tải truyện...</div>
+  <div id="viewer">⏳ Đang tải truyện, vui lòng đợi vài giây...</div>
 
   <script>
     var currentBook = null;
     var rendition = null;
 
-    function loadEpub(bookFileName) {
-      document.getElementById("viewer").innerHTML = "Đang tải dữ liệu...";
+    function loadEpub(fileName) {
+      var viewer = document.getElementById("viewer");
       var select = document.getElementById("toc");
+      viewer.innerHTML = "⏳ Đang kết nối tới file " + fileName + "...";
       select.innerHTML = "";
 
-      currentBook = ePub(bookFileName);
-      rendition = currentBook.renderTo("viewer", {
-        flow: "scrolled-doc",
-        width: "100%"
-      });
-
-      rendition.display();
-
-      currentBook.loaded.navigation.then(function(toc){
-        select.innerHTML = "";
-        toc.forEach(function(chapter) {
-          var option = document.createElement("option");
-          option.textContent = chapter.label.trim();
-          option.ref = chapter.href;
-          select.appendChild(option);
+      try {
+        currentBook = ePub(fileName);
+        rendition = currentBook.renderTo("viewer", {
+          flow: "scrolled-doc",
+          width: "100%"
         });
 
-        select.onchange = function(){
-          var index = select.selectedIndex;
-          var url = select.options[index].ref;
-          rendition.display(url);
-        };
-      }).catch(function(err){
-        document.getElementById("viewer").innerHTML = "Không thể tải danh sách chương. Vui lòng bấm làm mới trang!";
-      });
+        rendition.display().then(function(){
+          console.log("Đã hiển thị xong trang!");
+        }).catch(function(e){
+          viewer.innerHTML = "<div class='error-msg'>❌ Lỗi không thể đọc file " + fileName + ". Hãy kiểm tra tên file trên GitHub!</div>";
+        });
+
+        currentBook.loaded.navigation.then(function(toc){
+          select.innerHTML = "";
+          if(!toc || toc.length === 0) {
+            select.innerHTML = "<option>Không thấy chương</option>";
+            return;
+          }
+          toc.forEach(function(chapter) {
+            var option = document.createElement("option");
+            option.textContent = chapter.label.trim();
+            option.ref = chapter.href;
+            select.appendChild(option);
+          });
+
+          select.onchange = function(){
+            var index = select.selectedIndex;
+            var url = select.options[index].ref;
+            rendition.display(url);
+          };
+        }).catch(function(err){
+          console.log("Không lấy được danh sách chương", err);
+        });
+
+      } catch (err) {
+        viewer.innerHTML = "<div class='error-msg'>❌ Lỗi thư viện Epub.js: " + err.message + "</div>";
+      }
     }
 
-    // Load truyện 1 ban đầu
-    loadEpub("COTHE.epub");
+    // Tải truyện
+    window.onload = function() {
+      loadEpub("COTHE.epub");
+    };
 
     document.getElementById("book-select").onchange = function() {
       loadEpub(this.value);
@@ -78,6 +95,7 @@
 
     document.getElementById("next").onclick = function() { if(rendition) rendition.next(); };
     document.getElementById("prev").onclick = function() { if(rendition) rendition.prev(); };
-    </script>
+  </script>
+
 </body>
 </html>
