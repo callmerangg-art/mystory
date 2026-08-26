@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Đọc Truyện Cuộn Dọc</title>
-  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://unpkg.com/epubjs@0.3.93/dist/epub.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body, html { margin: 0; padding: 0; background: #f4f4f9; font-family: sans-serif; }
@@ -16,68 +16,90 @@
     }
     select { padding: 5px; font-size: 12px; max-width: 42%; border-radius: 4px; background: #fff; color: #000; }
     button { padding: 6px 10px; font-size: 12px; border: none; background: #007bff; color: white; border-radius: 4px; }
-    
-    /* Vùng chứa truyện cho phép Google Dịch quét an toàn */
     #viewer { 
       width: 100%; max-width: 800px; margin: 55px auto 10px auto; 
       padding: 15px; background: #fff; min-height: 80vh; overflow-x: hidden;
     }
+    .error-msg { color: red; font-weight: bold; text-align: center; padding: 20px; }
   </style>
 </head>
 <body>
 
-  <!-- Khối điều khiển không bị dịch đè -->
   <div id="controls" class="notranslate">
     <select id="book-select">
-      <option value="./COTHE.epub">Truyện 1 (COTHE)</option>
-      <option value="./COTHE2.epub">Truyện 2</option>
+      <option value="COTHE.epub">Truyện 1 (COTHE)</option>
+      <option value="COTHE2.epub">Truyện 2</option>
     </select>
     <button id="prev">Trước</button>
     <select id="toc"><option>Chọn chương...</option></select>
     <button id="next">Sau</button>
   </div>
 
-  <!-- Khối hiển thị văn bản hỗ trợ Google Dịch -->
-  <div id="viewer" translate="yes">Đang tải nội dung...</div>
+  <div id="viewer">Đang khởi tạo bộ đọc...</div>
 
   <script>
     var rendition = null;
+    var currentBook = null;
 
-    function renderBook(file) {
-      document.getElementById("viewer").innerHTML = "Đang nạp dữ liệu...";
+    async function renderBook(fileName) {
+      var viewer = document.getElementById("viewer");
       var select = document.getElementById("toc");
-      select.innerHTML = "";
+      viewer.innerHTML = "⏳ Đang tải file truyện (" + fileName + ")...";
+      select.innerHTML = "<option>Đang tải chương...</option>";
 
-      var book = ePub(file);
-      
-      // Cấu hình tối ưu riêng cho bộ dịch của Google trên di động
-      rendition = book.renderTo("viewer", {
-        flow: "scrolled-doc",
-        width: "100%",
-        height: "100%",
-        method: "continuous"
-      });
+      try {
+        // Tải file dưới dạng ArrayBuffer để tránh xung đột CORS/MIME
+        var response = await fetch(fileName);
+        if (!response.ok) throw new Error("Không tìm thấy file " + fileName);
+        var buffer = await response.arrayBuffer();
 
-      rendition.display();
+        if (rendition) rendition.destroy();
 
-      book.loaded.navigation.then(function(toc){
-        select.innerHTML = "";
-        toc.forEach(function(chapter) {
-          var option = document.createElement("option");
-          option.textContent = chapter.label.trim();
-          option.ref = chapter.href;
-          select.appendChild(option);
+        currentBook = ePub(buffer);
+        rendition = currentBook.renderTo("viewer", {
+          flow: "scrolled-doc",
+          width: "100%",
+          height: "100%"
         });
 
-        select.onchange = function(){
-          var index = select.selectedIndex;
-          var url = select.options[index].ref;
-          rendition.display(url);
-        };
-      });
+        await rendition.display();
+
+        currentBook.loaded.navigation.then(function(toc){
+          select.innerHTML = "";
+          if(!toc || toc.length === 0) {
+            select.innerHTML = "<option>Không có danh sách chương</option>";
+            return;
+          }
+          toc.forEach(function(chapter) {
+            var option = document.createElement("option");
+            option.textContent = chapter.label.trim();
+            option.ref = chapter.href;
+            select.appendChild(option);
+          });
+
+          select.onchange = function(){
+            var index = select.selectedIndex;
+            var url = select.options[index].ref;
+            rendition.display(url);
+          };
+        });
+
+      } catch (err) {
+        viewer.innerHTML = "<div class='error-msg'>❌ Lỗi: " + err.message + "<br>Hãy kiểm tra lại tên file trên GitHub!</div>";
+      }
     }
 
-    // Tự chạy khi tải xong
-    setTimeout(function() {
-      renderBook("./COTHE.epub");
-    }, 300);
+    // Tự động chạy khi load xong
+    window.addEventListener("load", function() {
+      renderBook("COTHE.epub");
+    });
+
+    document.getElementById("book-select").onchange = function() {
+      renderBook(this.value);
+    };
+
+    document.getElementById("next").onclick = function() { if(rendition) rendition.next(); };
+    document.getElementById("prev").onclick = function() { if(rendition) rendition.prev(); };
+  </script>
+</body>
+</html>
